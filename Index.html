@@ -1,0 +1,763 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <link rel="icon" href="https://cdn-icons-png.flaticon.com/512/824/824239.png" type="image/x-icon">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🎯 Tiro ao Alvo Pro - Gestão de Incentivo</title>
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
+
+    <style>
+        :root {
+            --bg: #0f172a; --card: #1e293b; --gold: #f59e0b;
+            --accent: #38bdf8; --danger: #ef4444; --success: #22c55e;
+        }
+        body { 
+            background: var(--bg); color: white; font-family: 'Segoe UI', sans-serif; 
+            display: flex; flex-direction: column; align-items: center; padding: 0; margin: 0; 
+            min-height: 100vh;
+        }
+        
+        .top-bar {
+            width: 100%; background: var(--card); padding: 12px; text-align: center; 
+            border-bottom: 2px solid var(--accent); margin-bottom: 20px; font-weight: bold; 
+            display: flex; justify-content: center; gap: 15px; align-items: center; flex-wrap: wrap;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3); z-index: 20;
+        }
+
+        .btn-copy-link {
+            background: var(--accent); color: #0f172a; border: none; padding: 6px 16px; 
+            border-radius: 6px; cursor: pointer; font-weight: bold; transition: 0.2s;
+        }
+        .btn-copy-link:hover { filter: brightness(1.1); transform: scale(1.02); }
+
+        .btn-change-room {
+            background: #334155; color: white; border: none; padding: 6px 16px; 
+            border-radius: 6px; cursor: pointer; font-weight: bold; transition: 0.2s;
+        }
+        .btn-change-room:hover { filter: brightness(1.1); transform: scale(1.02); }
+
+        .shaking { animation: shake 0.4s ease-in-out; }
+        @keyframes shake { 0%, 100% { transform: translate(0,0); } 25% { transform: translate(-4px, 2px); } 50% { transform: translate(4px, -2px); } }
+        
+        .container-principal { display: flex; gap: 20px; max-width: 1400px; width: 100%; z-index: 10; flex-wrap: wrap; padding: 0 20px 20px 20px; box-sizing: border-box;}
+        .painel-jogo { flex: 2; min-width: 300px; overflow-x: auto; padding-bottom: 20px;}
+        
+        .grid-container { 
+            display: grid; grid-template-columns: 50px repeat(10, 65px); gap: 10px; 
+            background: var(--card); padding: 25px; border-radius: 20px; 
+            box-shadow: 0 15px 35px rgba(0,0,0,0.5); justify-content: center;
+            width: fit-content; margin: 0 auto;
+        }
+        .coord-label { font-weight: 900; color: var(--accent); font-size: 1.4rem; display: flex; justify-content: center; align-items: center; }
+        
+        .alvo { width: 65px; height: 65px; perspective: 1000px; cursor: pointer; }
+        .alvo-interno { position: relative; width: 100%; height: 100%; transition: transform 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275); transform-style: preserve-3d; pointer-events: none; }
+        .face { position: absolute; width: 100%; height: 100%; backface-visibility: hidden; display: flex; justify-content: center; align-items: center; border-radius: 50%; border: 3px solid #fff; }
+        .frente { background: radial-gradient(circle, #ff4444 30%, #cc0000 100%); color: white; font-size: 1.8rem; font-weight: 900; text-shadow: 2px 2px 4px rgba(0,0,0,0.5); }
+        .verso { background: #fff; color: #0f172a; transform: rotateY(180deg); flex-direction: column; font-size: 0.8rem; font-weight: bold; text-align: center; }
+        
+        .atingido .alvo-interno { transform: rotateY(180deg); }
+        .atingido { pointer-events: none; opacity: 0.7; }
+        .premium { background: var(--gold) !important; color: black !important; }
+
+        .sidebar { flex: 1; display: flex; flex-direction: column; gap: 15px; min-width: 340px; }
+        .box { background: var(--card); padding: 18px; border-radius: 15px; border: 1px solid #334155; }
+        .admin-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; font-size: 0.9rem; }
+        .admin-row input { padding: 6px; background: #0f172a; border: 1px solid var(--accent); color: white; border-radius: 5px; font-weight: bold; width: 60px; text-align: center;}
+        
+        textarea#lista-vendedores-input { width: 100%; height: 60px; background: #0f172a; border: 1px solid var(--accent); color: white; border-radius: 5px; margin-top: 5px; padding: 5px; font-family: sans-serif; resize: vertical; box-sizing: border-box;}
+
+        .btn-gerar { width: 100%; padding: 12px; background: var(--danger); color: white; border: none; border-radius: 10px; font-weight: bold; cursor: pointer; margin-top: 10px; transition: 0.2s; }
+        .btn-gerar:hover { filter: brightness(1.1); }
+        
+        .btn-save-vendedores { background: var(--accent); color: #0f172a; width: 100%; border: none; padding: 8px; border-radius: 5px; font-weight: bold; cursor: pointer; margin-top: 5px; transition: 0.2s; }
+        .btn-save-vendedores:hover { filter: brightness(1.1); }
+
+        .btn-export { flex: 1; padding: 8px; border: none; border-radius: 5px; font-weight: bold; cursor: pointer; transition: 0.2s; font-size: 0.85rem; display: flex; align-items: center; justify-content: center; gap: 5px;}
+        .btn-pdf { background: #ef4444; color: white; }
+        .btn-excel { background: #10b981; color: white; }
+        .btn-export:hover { filter: brightness(1.1); }
+
+        .saldo-valor { font-family: monospace; font-size: 1.3rem; font-weight: bold; }
+        .positivo { color: var(--success); }
+        .negativo { color: var(--danger); }
+        .rank-row { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid #334155; }
+
+        /* Custom Modal Styles */
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(5px);
+            display: flex; align-items: center; justify-content: center; z-index: 9999;
+            opacity: 0; pointer-events: none; transition: opacity 0.3s;
+        }
+        .modal-overlay.active { opacity: 1; pointer-events: auto; }
+        .modal-box {
+            background: var(--card); padding: 25px 30px; border-radius: 15px; 
+            border: 2px solid var(--accent); text-align: center; 
+            max-width: 400px; width: 90%; box-shadow: 0 10px 30px rgba(0,0,0,0.6);
+            transform: scale(0.9); transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+        .modal-overlay.active .modal-box { transform: scale(1); }
+        .modal-msg { margin-bottom: 25px; font-size: 1.15rem; color: white; line-height: 1.5; }
+        .modal-btns { display: flex; gap: 15px; justify-content: center; }
+        .btn-modal { padding: 10px 20px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; transition: 0.2s; font-size: 1rem; }
+        .btn-modal.ok { background: var(--accent); color: #0f172a; width: 100%; }
+        .btn-modal.cancel { background: #334155; color: white; flex: 1; }
+        .btn-modal.confirm { background: var(--danger); color: white; flex: 1; }
+        .btn-modal:hover { filter: brightness(1.2); }
+        
+        #loading-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: var(--bg); display: flex; flex-direction: column; 
+            align-items: center; justify-content: center; z-index: 10000;
+        }
+        .spinner {
+            width: 50px; height: 50px; border: 5px solid rgba(56, 189, 248, 0.3);
+            border-radius: 50%; border-top-color: var(--accent);
+            animation: spin 1s ease-in-out infinite; margin-bottom: 20px;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+    </style>
+</head>
+<body id="corpo">
+
+<div id="loading-overlay">
+    <div class="spinner"></div>
+    <h2 style="color: var(--accent); font-weight: 300;">Conectando à Sala...</h2>
+</div>
+
+<div class="top-bar">
+    <span>📡 Sala de Sorteio Sincronizada: <span id="room-id-display" style="color: var(--accent); font-size: 1.2rem; margin: 0 10px; letter-spacing: 2px;">---</span></span>
+    <button onclick="copiarLinkSala()" class="btn-copy-link">🔗 Copiar Link da Sala</button>
+    <button onclick="entrarEmOutraSala()" class="btn-change-room">🚪 Entrar com Código</button>
+</div>
+
+<div class="container-principal">
+    <div class="painel-jogo">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 10px;">
+            <h2 style="margin:0; color: var(--accent);">🎯 SORTEIO DE INCENTIVO</h2>
+            <div style="background: var(--card); padding: 10px 20px; border-radius: 12px; border: 2px solid var(--accent);">
+                👤 Vendedor Logado: 
+                <select id="select-vendedor" style="padding:5px; background:#0f172a; color:white; border:none; font-weight:bold; min-width: 120px;"></select>
+            </div>
+        </div>
+        <div class="grid-container" id="grid-main"></div>
+    </div>
+
+    <div class="sidebar">
+        <!-- Caixa de Equipe -->
+        <div class="box" style="border-left: 5px solid var(--accent);">
+            <h3 style="margin:0 0 10px 0; color: var(--accent); font-size: 1rem;">👥 EQUIPE PARTICIPANTE</h3>
+            <textarea id="lista-vendedores-input" placeholder="Nomes separados por vírgula..."></textarea>
+            <button onclick="salvarVendedores()" class="btn-save-vendedores">ATUALIZAR EQUIPE (Sincroniza para Todos)</button>
+        </div>
+
+        <!-- Caixa de Configuração -->
+        <div class="box" style="border-color: var(--gold); border-width: 2px;">
+            <h3 style="margin:0 0 15px 0; color: var(--gold);">⚙️ CONFIGURAÇÃO DA CARTELA</h3>
+            
+            <div class="admin-row">
+                <b>🎯 TOTAL DE ALVOS:</b>
+                <input type="number" id="input-total-alvos" value="100" style="width: 100px;" oninput="calcularSaldosLocais()">
+            </div>
+            
+            <div class="admin-row">
+                <b>💰 ORÇAMENTO R$:</b>
+                <input type="number" id="input-incentivo" value="5000" style="width: 100px;" oninput="calcularSaldosLocais()">
+            </div>
+            
+            <p style="font-size: 0.7rem; color: #94a3b8; margin: 10px 0;">Valor (R$) | Qtd de Alvos (Configuração para a PRÓXIMA cartela):</p>
+            <div class="admin-row"><span>R$ <input type="number" id="v-1" value="1000"> :</span> <input type="number" id="q-1" value="1" oninput="calcularSaldosLocais()"></div>
+            <div class="admin-row"><span>R$ <input type="number" id="v-2" value="500"> :</span> <input type="number" id="q-2" value="2" oninput="calcularSaldosLocais()"></div>
+            <div class="admin-row"><span>R$ <input type="number" id="v-3" value="200"> :</span> <input type="number" id="q-3" value="5" oninput="calcularSaldosLocais()"></div>
+            <div class="admin-row"><span>R$ <input type="number" id="v-4" value="100"> :</span> <input type="number" id="q-4" value="10" oninput="calcularSaldosLocais()"></div>
+            <div class="admin-row"><span>R$ <input type="number" id="v-5" value="75"> :</span> <input type="number" id="q-5" value="10" oninput="calcularSaldosLocais()"></div>
+            <div class="admin-row" style="color: #64748b;"><span>Restante (R$ 50):</span> <b id="info-50">72</b></div>
+            <button onclick="confirmarNovaCartela()" class="btn-gerar">♻️ GERAR NOVA CARTELA (Zera o Jogo Atual)</button>
+        </div>
+
+        <!-- Caixa de Finanças -->
+        <div class="box">
+            <h3 style="margin:0 0 10px 0; color: var(--gold);">📊 RESUMO FINANCEIRO</h3>
+            <div style="display: flex; justify-content: space-between; margin-bottom: 8px;"><span>Total Sorteado:</span><span class="negativo saldo-valor" id="resumo-gasto">R$ 0,00</span></div>
+            <div style="display: flex; justify-content: space-between; border-top: 1px solid #333; padding-top: 10px;"><span>Saldo Incentivo:</span><span class="positivo saldo-valor" id="resumo-saldo">R$ 0,00</span></div>
+            
+            <div style="display: flex; gap: 10px; margin-top: 15px;">
+                <button onclick="exportarPDF()" class="btn-export btn-pdf">📄 EXPORTAR PDF</button>
+                <button onclick="exportarExcel()" class="btn-export btn-excel">📊 EXPORTAR EXCEL</button>
+            </div>
+        </div>
+
+        <!-- Caixa de Ranking -->
+        <div class="box">
+            <h3 style="margin:0 0 10px 0; color:var(--accent)">🏆 RANKING</h3>
+            <div id="rank-lista"></div>
+        </div>
+    </div>
+</div>
+
+<!-- Custom Modal Overlay -->
+<div id="custom-modal" class="modal-overlay">
+    <div class="modal-box">
+        <div id="modal-msg" class="modal-msg">Mensagem</div>
+        
+        <!-- Adicionado o campo de input personalizado para o modal -->
+        <div id="modal-input-container" style="display:none; margin-top: 15px; margin-bottom: 20px;">
+            <input type="text" id="modal-input" placeholder="EX: AB12CD" maxlength="6" style="width: 100%; box-sizing: border-box; padding: 12px; border-radius: 8px; border: 2px solid var(--accent); background: #0f172a; color: white; text-align: center; font-size: 1.4rem; text-transform: uppercase; font-weight: bold;">
+        </div>
+
+        <div id="modal-btns" class="modal-btns">
+            <!-- Buttons are injected by JS -->
+        </div>
+    </div>
+</div>
+
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+    import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+    import { getFirestore, doc, getDoc, setDoc, updateDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+    // --- ESTADO GLOBAL DA APLICAÇÃO ---
+    let gameState = {
+        premios: [],
+        logs: [],
+        rank: {},
+        equipe: "GABI, ANA, BRUNO",
+        total_alvos: 100,
+        orcamento: 5000,
+        config_salva: null
+    };
+
+    const letras = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J"];
+    let isFirebaseReady = false;
+    let currentUser = null;
+    let dbRef = null;
+    let dbInstance = null;
+    let hasLoadedInitialData = false;
+    let unsubscribeSnapshot = null;
+
+    // --- GERENCIAMENTO DE MODAL PERSONALIZADO ---
+    window.showAlert = function(msg) {
+        const modal = document.getElementById('custom-modal');
+        document.getElementById('modal-msg').innerText = msg;
+        document.getElementById('modal-btns').innerHTML = `<button class="btn-modal ok" onclick="closeModal()">OK, Entendi</button>`;
+        modal.classList.add('active');
+    };
+
+    window.showConfirm = function(msg, onConfirm) {
+        const modal = document.getElementById('custom-modal');
+        document.getElementById('modal-msg').innerText = msg;
+        document.getElementById('modal-btns').innerHTML = `
+            <button class="btn-modal cancel" onclick="closeModal()">Cancelar</button>
+            <button class="btn-modal confirm" id="btn-modal-confirm">Sim, Confirmar</button>
+        `;
+        document.getElementById('btn-modal-confirm').onclick = () => {
+            closeModal();
+            onConfirm();
+        };
+        modal.classList.add('active');
+    };
+
+    window.closeModal = function() {
+        document.getElementById('custom-modal').classList.remove('active');
+        document.getElementById('modal-input-container').style.display = 'none';
+    };
+
+    window.showPrompt = function(msg, onConfirm) {
+        const modal = document.getElementById('custom-modal');
+        document.getElementById('modal-msg').innerText = msg;
+        const inputContainer = document.getElementById('modal-input-container');
+        const input = document.getElementById('modal-input');
+        
+        inputContainer.style.display = 'block';
+        input.value = '';
+        
+        document.getElementById('modal-btns').innerHTML = `
+            <button class="btn-modal cancel" onclick="closeModal()">Cancelar</button>
+            <button class="btn-modal confirm" id="btn-modal-confirm">Entrar na Sala</button>
+        `;
+        
+        document.getElementById('btn-modal-confirm').onclick = () => {
+            const val = input.value.trim().toUpperCase();
+            if(val) {
+                closeModal();
+                onConfirm(val);
+            } else {
+                window.showAlert("Por favor, digite um código válido.");
+            }
+        };
+        
+        modal.classList.add('active');
+        input.focus();
+    };
+
+    // --- CÓDIGO DA SALA (URL SYNC) ---
+    function getOrCreateRoomId() {
+        const params = new URLSearchParams(window.location.search);
+        let room = params.get('sala');
+        
+        // Verifica também se o código da sala foi passado na Hash da URL (#sala=...)
+        if (!room) {
+            const hashMatch = window.location.hash.match(/sala=([^&]+)/);
+            if (hashMatch) room = hashMatch[1];
+        }
+
+        // Em ambientes restritos (como este preview), recuperamos pela sessão
+        if (!room) {
+            room = sessionStorage.getItem('current_room_id');
+        }
+        
+        if (!room) {
+            // Gera um código de 6 caracteres seguro para URL
+            room = Math.random().toString(36).substring(2, 8).toUpperCase();
+            
+            try {
+                // Tenta atualizar a URL apenas se não for um ambiente blob (preview seguro)
+                if (!window.location.href.startsWith('blob:')) {
+                    const newUrl = window.location.protocol + "//" + window.location.host + window.location.pathname + '?sala=' + room;
+                    window.history.replaceState({path:newUrl}, '', newUrl);
+                }
+            } catch (e) {
+                console.warn("Ambiente restrito de visualização: Não foi possível alterar a URL no histórico nativo.");
+            }
+        }
+        
+        sessionStorage.setItem('current_room_id', room);
+        document.getElementById('room-id-display').innerText = room;
+        return room;
+    }
+
+    window.copiarLinkSala = function() {
+        let isRestricted = window.location.href.startsWith('blob:') || window.location.href.includes('sandbox') || window.location.href.includes('usercontent.com');
+        
+        // Tenta capturar a URL real ou monta o link limpo
+        let urlBase = (!isRestricted && window.location.protocol.startsWith('http')) ? 
+            (window.location.protocol + "//" + window.location.host + window.location.pathname) : 
+            "https://seu-dominio.com";
+            
+        let urlCompleta = urlBase + '?sala=' + salaId;
+        
+        let textoParaCopiar = isRestricted ? 
+            `🎯 Junte-se ao Sorteio de Incentivo!\n\n🔑 Código da Sala: ${salaId}\n\n👉 Abra o aplicativo e clique em "Entrar com Código" informando: ${salaId}` : 
+            urlCompleta;
+        
+        const input = document.createElement('textarea');
+        input.value = textoParaCopiar;
+        document.body.appendChild(input);
+        input.select();
+        try {
+            document.execCommand('copy');
+            if (isRestricted) {
+                window.showAlert(`CÓDIGO COPIADO COM SUCESSO!\n\nComo você está no ambiente de teste, envie o código da sala para sua equipe:\n\n👉 ${salaId}\n\nBasta eles clicarem em "Entrar com Código" no topo da tela.`);
+            } else {
+                window.showAlert("Link copiado para a área de transferência! Envie para sua equipe.");
+            }
+        } catch (e) {
+            window.showAlert("Ocorreu um erro ao tentar copiar.");
+        }
+        document.body.removeChild(input);
+    };
+
+    window.entrarEmOutraSala = function() {
+        window.showPrompt("Digite o código de 6 letras da sala do seu colega:", (codigo) => {
+            if (codigo && codigo.length >= 4) {
+                mudarSalaDinamicamente(codigo);
+            }
+        });
+    };
+
+    function mudarSalaDinamicamente(novoCodigo) {
+        if (unsubscribeSnapshot) unsubscribeSnapshot(); // Para de ouvir a sala velha
+        
+        salaId = novoCodigo.trim().toUpperCase();
+        sessionStorage.setItem('current_room_id', salaId);
+        document.getElementById('room-id-display').innerText = salaId;
+        
+        try {
+            if (!window.location.href.startsWith('blob:')) {
+                const newUrl = window.location.protocol + "//" + window.location.host + window.location.pathname + '?sala=' + salaId;
+                window.history.replaceState({path:newUrl}, '', newUrl);
+            }
+        } catch(e){}
+
+        // Exibe tela de carregamento e reseta flags locais
+        document.getElementById('loading-overlay').style.display = 'flex';
+        document.querySelector('.spinner').style.display = 'block';
+        document.querySelector('#loading-overlay h2').innerText = 'Conectando à nova sala...';
+        hasLoadedInitialData = false;
+        
+        // Aponta pro novo documento e reconecta (sem dar refresh na página!)
+        dbRef = doc(dbInstance, 'artifacts', appId, 'public', 'data', 'salas_tiro_ao_alvo', salaId);
+        setupRealtimeSync();
+    }
+
+    const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-tiro-alvo-id';
+    const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
+    const initialToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+    let salaId = getOrCreateRoomId(); // Agora é 'let' para permitir a troca de salas!
+
+    async function initFirebase() {
+        if (!firebaseConfig) {
+            console.error("Configuração Firebase ausente, caindo para modo Offline.");
+            document.getElementById('loading-overlay').style.display = 'none';
+            window.showAlert("Aviso: Modo Offline. A sincronização de nuvem não está ativa sem as credenciais do ambiente.");
+            return;
+        }
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        dbInstance = getFirestore(app);
+
+        try {
+            if (initialToken) {
+                await signInWithCustomToken(auth, initialToken);
+            } else {
+                await signInAnonymously(auth);
+            }
+            currentUser = auth.currentUser;
+            
+            // Regra Crítica: Caminho rigoroso de dados públicos baseado no AppID fornecido pelo sistema.
+            dbRef = doc(dbInstance, 'artifacts', appId, 'public', 'data', 'salas_tiro_ao_alvo', salaId);
+            
+            setupRealtimeSync();
+        } catch (error) {
+            console.error("Erro na autenticação:", error);
+            document.getElementById('loading-overlay').style.display = 'none';
+            window.showAlert("Falha ao conectar com a nuvem.");
+        }
+    }
+
+    function setupRealtimeSync() {
+        if(!currentUser) return; // Guard
+        
+        if (unsubscribeSnapshot) unsubscribeSnapshot();
+        
+        unsubscribeSnapshot = onSnapshot(dbRef, (snapshot) => {
+            if (snapshot.exists()) {
+                const data = snapshot.data();
+                gameState = { ...gameState, ...data };
+                atualizarUIComBaseNoEstado();
+            } else {
+                // Sala não existe na nuvem ainda, inicializamos os padrões
+                inicializarSalaNovaNuvem();
+            }
+            
+            if(!hasLoadedInitialData) {
+                hasLoadedInitialData = true;
+                document.getElementById('loading-overlay').style.display = 'none';
+            }
+        }, (error) => {
+            console.error("Erro na sincronização:", error);
+        });
+    }
+
+    async function atualizarNuvem(dadosParciais) {
+        if (!currentUser || !dbRef) return;
+        try {
+            await setDoc(dbRef, dadosParciais, { merge: true });
+        } catch (e) {
+            console.error("Erro ao salvar:", e);
+        }
+    }
+
+    async function inicializarSalaNovaNuvem() {
+        // Base de fallback (100 alvos de 50)
+        let premiosBase = Array(100).fill(50);
+        let dadosBase = {
+            premios: premiosBase, logs: [], rank: {}, equipe: "GABI, ANA, BRUNO",
+            total_alvos: 100, orcamento: 5000, config_salva: null
+        };
+        await setDoc(dbRef, dadosBase); // Força criação do documento
+    }
+
+    // --- FUNÇÕES DE INTERFACE E LÓGICA DE NEGÓCIO ---
+    function atualizarUIComBaseNoEstado() {
+        // Atualizar inputs de equipe
+        document.getElementById('lista-vendedores-input').value = gameState.equipe;
+        
+        const select = document.getElementById('select-vendedor');
+        const nomes = gameState.equipe.split(',').map(n => n.trim().toUpperCase()).filter(n => n !== "");
+        const selecaoAtual = select.value; // Manter selecionado o que o cara já tava
+        
+        select.innerHTML = nomes.map(n => `<option value="${n}">${n}</option>`).join('');
+        if (nomes.includes(selecaoAtual)) select.value = selecaoAtual;
+
+        // Atualizar inputs administrativos se estiverem salvos
+        document.getElementById('input-total-alvos').value = gameState.total_alvos;
+        document.getElementById('input-incentivo').value = gameState.orcamento;
+        
+        if (gameState.config_salva) {
+            for(let i=1; i<=5; i++) {
+                if(document.getElementById(`v-${i}`)) document.getElementById(`v-${i}`).value = gameState.config_salva[`v${i}`];
+                if(document.getElementById(`q-${i}`)) document.getElementById(`q-${i}`).value = gameState.config_salva[`q${i}`];
+            }
+        }
+
+        montarGradeBaseadaNoEstado();
+        calcularSaldosLocais();
+    }
+
+    window.salvarVendedores = function() {
+        const input = document.getElementById('lista-vendedores-input').value;
+        if(input.trim() === "") return window.showAlert("Digite ao menos um nome para a equipe!");
+        
+        // Atualiza local e manda para nuvem
+        gameState.equipe = input;
+        atualizarNuvem({ equipe: input });
+        window.showAlert("Lista de equipe atualizada e sincronizada com a sala!");
+    };
+
+    window.calcularSaldosLocais = function() {
+        // Financeiro Real (Baseado no histórico/logs de estado global)
+        const gasto = gameState.logs.reduce((acc, curr) => acc + curr.v, 0);
+        const saldo = gameState.orcamento - gasto;
+        
+        document.getElementById('resumo-gasto').innerText = `R$ ${gasto.toLocaleString('pt-BR')}`;
+        const elS = document.getElementById('resumo-saldo');
+        elS.innerText = `R$ ${saldo.toLocaleString('pt-BR')}`;
+        elS.className = `saldo-valor ${saldo >= 0 ? 'positivo' : 'negativo'}`;
+        
+        // Atualiza Ranking Visual
+        const rankLocal = {};
+        gameState.logs.forEach(l => { rankLocal[l.vend] = (rankLocal[l.vend] || 0) + l.v; });
+        
+        document.getElementById('rank-lista').innerHTML = Object.entries(rankLocal)
+            .sort((a,b) => b[1] - a[1]) // Decrescente
+            .map(([v, t]) => `<div class="rank-row"><span>${v}</span><b>R$ ${t}</b></div>`).join('');
+
+        // Simulação de Configuração p/ Nova Cartela
+        const totalInput = parseInt(document.getElementById('input-total-alvos').value) || 0;
+        let somaQtds = 0;
+        for(let i=1; i<=5; i++) somaQtds += (parseInt(document.getElementById(`q-${i}`).value) || 0);
+        
+        const resto = totalInput - somaQtds;
+        const info50 = document.getElementById('info-50');
+        info50.innerText = resto;
+        info50.style.color = resto < 0 ? 'var(--danger)' : '#64748b';
+    };
+
+    window.confirmarNovaCartela = function() {
+        window.showConfirm("CUIDADO: Isto apagará todo o histórico atual e gerará uma nova cartela para TODOS na sala! Deseja continuar?", () => {
+            gerarNovaCartelaEfetiva();
+        });
+    };
+
+    function gerarNovaCartelaEfetiva() {
+        const orcamentoNovo = parseFloat(document.getElementById('input-incentivo').value) || 0;
+        const totalAlvosNovo = parseInt(document.getElementById('input-total-alvos').value) || 100;
+        
+        let cfg = {};
+        let configsArray = [];
+        for(let i=1; i<=5; i++) {
+            let v = parseInt(document.getElementById(`v-${i}`).value) || 0;
+            let q = parseInt(document.getElementById(`q-${i}`).value) || 0;
+            cfg[`v${i}`] = v; cfg[`q${i}`] = q;
+            configsArray.push({v, q});
+        }
+        
+        const qtdSoma = configsArray.reduce((acc, item) => acc + item.q, 0);
+        const qtdRestante = totalAlvosNovo - qtdSoma;
+        
+        const valorTotalConfigurado = configsArray.reduce((acc, item) => acc + (item.v * item.q), 0) + (qtdRestante * 50);
+
+        if (qtdRestante < 0) return window.showAlert(`Erro: A soma dos prêmios (${qtdSoma}) excede o Total de Alvos (${totalAlvosNovo})!`);
+        if (valorTotalConfigurado > orcamentoNovo) return window.showAlert(`Bloqueado: Custo potencial (R$ ${valorTotalConfigurado}) excede o Orçamento Máximo!`);
+
+        // Geração
+        let p = [];
+        configsArray.forEach(item => { for(let i=0; i<item.q; i++) p.push(item.v); });
+        for(let i=0; i<qtdRestante; i++) p.push(50);
+        
+        // Embaralha
+        p.sort(() => Math.random() - 0.5);
+
+        // Prepara objeto completo para sobrescrever o banco
+        const novoEstado = {
+            premios: p, logs: [], rank: {}, 
+            equipe: gameState.equipe, total_alvos: totalAlvosNovo, 
+            orcamento: orcamentoNovo, config_salva: cfg
+        };
+
+        // Salva na nuvem, o onSnapshot cuidará de re-renderizar para todo mundo, inclusive localmente
+        atualizarNuvem(novoEstado);
+        window.showAlert("Nova Cartela Gerada e Sincronizada!");
+    }
+
+    function montarGradeBaseadaNoEstado() {
+        const grid = document.getElementById('grid-main');
+        grid.innerHTML = ''; 
+        grid.appendChild(document.createElement('div')); // Canto vazio A1
+        
+        letras.forEach(l => {
+            const el = document.createElement('div'); el.className = 'coord-label'; el.innerText = l; grid.appendChild(el);
+        });
+
+        const linhasNecessarias = Math.ceil(gameState.total_alvos / 10);
+        let idx = 0;
+
+        for (let i = 1; i <= linhasNecessarias; i++) {
+            const nl = document.createElement('div'); nl.className = 'coord-label'; nl.innerText = i; grid.appendChild(nl);
+            
+            for (let j = 0; j < 10; j++) {
+                if (idx >= gameState.total_alvos) {
+                    const empty = document.createElement('div');
+                    grid.appendChild(empty);
+                    continue;
+                }
+
+                const nAlvo = idx + 1;
+                const vAlvo = gameState.premios[idx];
+                const sorteado = gameState.logs.find(x => x.n === nAlvo);
+                
+                const container = document.createElement('div');
+                container.className = 'alvo' + (sorteado ? ' atingido' : '');
+                
+                // Configuração visual
+                container.innerHTML = `
+                    <div class="alvo-interno">
+                        <div class="face frente">${nAlvo}</div>
+                        <div class="face verso ${vAlvo >= 500 ? 'premium' : ''}">
+                            <b style="font-size:1.1rem">R$ ${vAlvo}</b>
+                            <span class="nome-ganhador" style="font-size:0.6rem; color:#555; margin-top:4px;">${sorteado ? sorteado.vend : ''}</span>
+                        </div>
+                    </div>`;
+                
+                // Closure Event
+                container.onclick = function() { clicaAlvo(this, nAlvo, vAlvo); };
+                grid.appendChild(container);
+                idx++;
+            }
+        }
+    }
+
+    window.clicaAlvo = function(elemento, num, valor) {
+        if (elemento.classList.contains('atingido')) return;
+        
+        const vendedor = document.getElementById('select-vendedor').value;
+        if(!vendedor) return window.showAlert("Selecione seu nome como vendedor antes de atirar!");
+
+        // Verifica consistência (se alguém atirou meio segundo antes)
+        if(gameState.logs.find(x => x.n === num)) return window.showAlert("Ops! Alguém acabou de atirar neste alvo antes de você!");
+
+        // Efeito visual imediato local
+        document.getElementById('corpo').classList.add('shaking');
+        setTimeout(() => document.getElementById('corpo').classList.remove('shaking'), 400);
+        elemento.classList.add('atingido');
+        const spanNome = elemento.querySelector('.nome-ganhador');
+        if(spanNome) spanNome.innerText = vendedor;
+
+        // Atualização de Estado
+        const novoLog = { n: num, v: valor, vend: vendedor };
+        const logsAtualizados = [...gameState.logs, novoLog];
+        
+        // Atualiza Nuvem
+        atualizarNuvem({ logs: logsAtualizados });
+
+        // Feedback por Voz
+        try {
+            const voz = new SpeechSynthesisUtterance(`${vendedor} ganhou ${valor} reais`);
+            voz.lang = 'pt-BR'; window.speechSynthesis.speak(voz);
+        } catch (e) {
+            console.warn("API de voz indisponível", e);
+        }
+    };
+
+    window.processarDadosRelatorio = function() {
+        const dados = {};
+        let totalGasto = 0;
+
+        gameState.logs.forEach(log => {
+            if (!dados[log.vend]) dados[log.vend] = { qtd: 0, valor: 0 };
+            dados[log.vend].qtd += 1;
+            dados[log.vend].valor += log.v;
+            totalGasto += log.v;
+        });
+
+        const arrayDados = Object.entries(dados)
+            .sort((a, b) => b[1].valor - a[1].valor)
+            .map(([vendedor, info]) => [vendedor, info.qtd, info.valor]);
+
+        const orcamento = parseFloat(document.getElementById('input-incentivo').value) || 0;
+        const saldo = orcamento - totalGasto;
+
+        return { arrayDados, totalGasto, orcamento, saldo };
+    };
+
+    window.exportarExcel = function() {
+        if (gameState.logs.length === 0) return window.showAlert("Nenhum alvo foi sorteado ainda para exportar!");
+        
+        const rel = processarDadosRelatorio();
+        let csvContent = "Vendedor;Quantidade de Alvos;Valor Total Ganho (R$)\n";
+        
+        rel.arrayDados.forEach(row => {
+            csvContent += `${row[0]};${row[1]};${row[2].toFixed(2).replace('.', ',')}\n`;
+        });
+        
+        csvContent += `\nRESUMO GERAL - SALA: ${salaId}\n`;
+        csvContent += `Orçamento Total;R$ ${rel.orcamento.toFixed(2).replace('.', ',')}\n`;
+        csvContent += `Total Sorteado (Gasto);R$ ${rel.totalGasto.toFixed(2).replace('.', ',')}\n`;
+        csvContent += `Saldo Restante;R$ ${rel.saldo.toFixed(2).replace('.', ',')}\n`;
+
+        const bom = "\uFEFF"; 
+        const blob = new Blob([bom + csvContent], { type: "text/csv;charset=utf-8;" });
+        const url = URL.createObjectURL(blob);
+        
+        const link = document.createElement("a");
+        link.setAttribute("href", url);
+        link.setAttribute("download", `resumo_incentivo_sala_${salaId}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
+
+    window.exportarPDF = function() {
+        if (gameState.logs.length === 0) return window.showAlert("Nenhum alvo foi sorteado ainda para exportar!");
+        if (!window.jspdf) return window.showAlert("Aguarde um momento, a biblioteca de PDF está carregando.");
+
+        const rel = processarDadosRelatorio();
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF();
+
+        doc.setFontSize(18);
+        doc.setTextColor(15, 23, 42); 
+        doc.text("Resumo Financeiro - Tiro ao Alvo Sincronizado", 14, 22);
+        
+        doc.setFontSize(10);
+        doc.setTextColor(100);
+        doc.text(`Sala: ${salaId} | Data da extração: ${new Date().toLocaleDateString('pt-BR')} às ${new Date().toLocaleTimeString('pt-BR')}`, 14, 30);
+
+        const corpoTabela = rel.arrayDados.map(row => [row[0], row[1].toString(), `R$ ${row[2].toFixed(2).replace('.', ',')}`]);
+
+        doc.autoTable({
+            startY: 35,
+            head: [['Vendedor (a)', 'Qtd. de Alvos Atingidos', 'Valor Total Ganho']],
+            body: corpoTabela,
+            theme: 'striped',
+            headStyles: { fillColor: [56, 189, 248] },
+            styles: { halign: 'center', fontSize: 11 },
+            columnStyles: { 0: { halign: 'left', fontStyle: 'bold' } }
+        });
+
+        const finalY = doc.lastAutoTable.finalY || 40;
+        doc.setFontSize(11);
+        doc.setTextColor(0);
+        
+        doc.text(`Orçamento Total: R$ ${rel.orcamento.toFixed(2).replace('.', ',')}`, 14, finalY + 15);
+        doc.text(`Total Sorteado (Gasto): R$ ${rel.totalGasto.toFixed(2).replace('.', ',')}`, 14, finalY + 22);
+        
+        doc.setFont(undefined, 'bold');
+        if(rel.saldo < 0) doc.setTextColor(239, 68, 68);
+        else doc.setTextColor(34, 197, 94);
+        doc.text(`Saldo Restante: R$ ${rel.saldo.toFixed(2).replace('.', ',')}`, 14, finalY + 29);
+
+        doc.save(`resumo_incentivo_sala_${salaId}.pdf`);
+    };
+
+    // INÍCIO DA APLICAÇÃO
+    initFirebase();
+</script>
+</body>
+</html>
